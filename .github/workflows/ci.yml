@@ -1,0 +1,66 @@
+name: ci
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.module.name }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        module:
+          - name: legacy
+            path: .
+            minimum_coverage: 80
+          - name: v2
+            path: v2
+            minimum_coverage: 65
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26.x'
+          cache-dependency-path: |
+            go.sum
+            v2/go.sum
+      - name: Build
+        working-directory: ${{ matrix.module.path }}
+        run: go build -mod=readonly ./...
+      - name: Test with race detector and coverage
+        working-directory: ${{ matrix.module.path }}
+        run: go test -mod=readonly -race -coverprofile=coverage.out ./...
+      - name: Vet
+        working-directory: ${{ matrix.module.path }}
+        run: go vet -mod=readonly ./...
+      - name: Check minimum coverage
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: ${{ matrix.module.path }}
+        env:
+          MINIMUM_COVERAGE: ${{ matrix.module.minimum_coverage }}
+        run: |
+          coverage=$(go tool cover -func=coverage.out | awk '$1 == "total:" { gsub("%", "", $3); print $3 }')
+          test -n "$coverage"
+          echo "Coverage: $coverage%; minimum: $MINIMUM_COVERAGE%"
+          awk -v actual="$coverage" -v minimum="$MINIMUM_COVERAGE" 'BEGIN { exit (actual < minimum) }'
+
+  formatting:
+    name: Go formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check gofmt
+        run: |
+          files=$(gofmt -l evidence.go evidence_test.go v2/*.go)
+          if [ -n "$files" ]; then
+            echo "$files"
+            exit 1
+          fi
