@@ -7,6 +7,17 @@ provided by the separate Go module `github.com/veraison/ratsd-token/v2`.
 Both modules require Go 1.26 or newer. See [the CDDL specification](docs/ratsd-token.cddl)
 and [the v2 token example](docs/ratsd-token-example.diag) for their wire formats.
 
+The root module also contains `github.com/veraison/ratsd-token/tokens` for
+attester payloads shared by RATSD and its consumers. It provides `TSMReport`
+and `GPUEvidence` with JSON and CBOR support as appropriate. Their formats are
+specified in [TSM report CDDL](docs/tsm-report.cddl) and
+[NVIDIA GPU evidence CDDL](docs/nvidia-gpu-evidence.cddl).
+
+Consumers of `github.com/veraison/ratsd/tokens` should switch to
+`github.com/veraison/ratsd-token/tokens`. Once all such imports are updated,
+they can remove the `github.com/veraison/ratsd` module requirement and run
+`go mod tidy`.
+
 ## Testing
 
 Run tests in each module:

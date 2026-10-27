@@ -59,7 +59,7 @@ jobs:
           persist-credentials: false
       - name: Check gofmt
         run: |
-          files=$(gofmt -l evidence.go evidence_test.go v2/*.go)
+          files=$(gofmt -l evidence.go evidence_test.go tokens/*.go v2/*.go)
           if [ -n "$files" ]; then
             echo "$files"
             exit 1
