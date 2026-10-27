@@ -1,7 +1,7 @@
 nvidia-gpu-evidence = [
   + {
     "arch": arch-type
-    "certificate": certificate-type    
+    "certificate": certificate-type
     "evidence": evidence-type
     "nonce": nonce-type
   }

@@ -5,11 +5,9 @@ package tokens
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"testing"
 
-	"github.com/NVIDIA/go-nvml/pkg/nvml"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -51,7 +49,7 @@ func Test_GPUEvidence_Valid_Fail_WrongNonceSize(t *testing.T) {
 	evidence := validGPUEvidence()
 	evidence.Devices[0].Nonce = []byte("short")
 
-	assert.EqualError(t, evidence.Valid(), fmt.Sprintf(`invalid field "[0].nonce": expected %d bytes, got 5`, nvml.CC_GPU_CEC_NONCE_SIZE))
+	assert.EqualError(t, evidence.Valid(), `invalid field "[0].nonce": expected 32 bytes, got 5`)
 }
 
 func Test_GPUEvidence_Valid_Fail_MissingDevices(t *testing.T) {

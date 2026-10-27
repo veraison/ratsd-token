@@ -7,14 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
-	"github.com/NVIDIA/go-nvml/pkg/nvml"
 )
 
 const (
 	GPUEvidenceMediaTypeJSON = "application/vnd.veraison.nvidia-gpu-evidence+json"
 
-	gpuEvidenceNonceSize = nvml.CC_GPU_CEC_NONCE_SIZE
+	// The GPU evidence format requires a 32-byte nonce (see docs/nvidia-gpu-evidence.cddl).
+	gpuEvidenceNonceSize = 32
 )
 
 type GPUDeviceEvidence struct {
