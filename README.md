@@ -18,6 +18,53 @@ Consumers of `github.com/veraison/ratsd/tokens` should switch to
 they can remove the `github.com/veraison/ratsd` module requirement and run
 `go mod tidy`.
 
+## Token generator
+
+`gen-ratsd-token` packages one or more component evidence tokens into a signed
+RATSD v2 CBOR/COSE token. Its source is in
+[`v2/cmd/gen-ratsd-token`](v2/cmd/gen-ratsd-token).
+
+Build it from this checkout:
+
+```sh
+cd v2
+go build -o gen-ratsd-token ./cmd/gen-ratsd-token
+cd ..
+```
+
+Each component is specified as three positional arguments: its collection key,
+media type, and file path. For example, from the repository root:
+
+```sh
+./v2/gen-ratsd-token \
+  --key v2/cmd/gen-ratsd-token/testdata/ec-p256.jwk \
+  --nonce 0123456789abcdef \
+  --oemid 1337 \
+  --output ratsd-token.cbor \
+  cca \
+    'application/eat-collection; profile="http://arm.com/CCA-SSD/1.0.0"' \
+    v2/cmd/gen-ratsd-token/testdata/cca-good.cbor \
+  eat-da \
+    'application/eat-ucs+json; eat_profile="tag:linaro.org,2025:device#1.0.0"' \
+    v2/cmd/gen-ratsd-token/testdata/da-spdm-good.cbor
+```
+
+The signing key must be a private JWK. Without `--key`, the command reads
+`key.jwk` in the current directory. Supported keys are EC P-256/P-384/P-521,
+Ed25519, and RSA with a `PS256`, `PS384`, or `PS512` JWK algorithm.
+The included key is a public test fixture and must not be used for real signing.
+
+`--nonce` takes a hex-encoded value; omitting it generates a random 64-byte
+nonce. The default output is `ratsd-token.cbor`. Use `--help` for the remaining
+claim overrides and logging options.
+
+After building, `./scripts/gen-sample-token` generates a token using the bundled
+fixtures and writes it into the current directory.
+
+The utility and sample data were moved from `veraison/gen-ratsd-token` at commit
+`96f2df7d9b0b01772255ca651d0f842354dd37bb`. The utility now uses this repository's
+v2 module directly.
+
 ## Testing
 
 Run tests in each module:
