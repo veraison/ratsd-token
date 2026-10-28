@@ -6,34 +6,68 @@
 
 vtpm-evidence = {
   ? tsm-report: tsm-report
-  quote: tpm2b-attest
-  signature: tpmt-signature
+  attestation: tpm-attestation
   ek-public: binary-string
   ak-public: binary-string
-  ? pcr-banks: [ + vtpm-pcr-bank ]
   ? event-log: binary-string
 }
 
-; TPM binary structures are defined in TPM Library Part 2 v185,
-; Tables 154, 155, and 219:
+; Attestation types and TPM binary structures are defined in
+; TPM Library Part 2 v185, Tables 21, 152-155, and 219:
 ; https://trustedcomputinggroup.org/wp-content/uploads/Trusted-Platform-Module-2.0-Library-Part-2-Structures_Version-185_pub.pdf
+
+tpm-attestation = tpm-quote-attestation / tpm-other-attestation
+
+; TPM_ST_ATTEST_QUOTE = 0x8018. Only quotes can carry PCR hints.
+tpm-quote-attestation = {
+  type: 0x8018
+  data: tpm2b-attest
+  signature: tpmt-signature
+  ? pcr-banks: [ + vtpm-pcr-bank ]
+}
+
+tpm-other-attestation = {
+  type: tpm-other-attestation-type
+  data: tpm2b-attest
+  signature: tpmt-signature
+}
+
+; Non-quote TPMI_ST_ATTEST values from Table 152, with numeric
+; assignments from Table 21. New types require a schema update.
+tpm-other-attestation-type = &(
+  TPM_ST_ATTEST_NV:            0x8014
+  TPM_ST_ATTEST_COMMAND_AUDIT: 0x8015
+  TPM_ST_ATTEST_SESSION_AUDIT: 0x8016
+  TPM_ST_ATTEST_CERTIFY:       0x8017
+  TPM_ST_ATTEST_TIME:          0x8019
+  TPM_ST_ATTEST_CREATION:      0x801A
+  TPM_ST_ATTEST_NV_DIGEST:     0x801C
+)
+
 ; The verifier MUST enforce the decoded-payload requirements below.
 ; Both payloads MUST use TPM 2.0 wire format, with no padding or trailing
 ; bytes. binary-string provides the CBOR or JSON transport encoding.
+; The enclosing attestation's type MUST equal the signed TPMS_ATTEST.type.
+; The verifier MUST validate the signature and perform type-specific
+; appraisal under its policy. Attestation types unsupported by the
+; verifier or disallowed by the applicable TPM profile MUST NOT be
+; accepted merely because they are allowed by this schema.
 
 ; The decoded bytes MUST contain one marshalled TPM2B_ATTEST, including
 ; its big-endian UINT16 size prefix. size MUST equal the number of bytes
 ; in attestationData. attestationData MUST contain a marshalled TPMS_ATTEST
-; with magic = TPM_GENERATED_VALUE and type = TPM_ST_ATTEST_QUOTE.
+; with magic = TPM_GENERATED_VALUE. Its attested union MUST be decoded
+; according to TPMS_ATTEST.type.
 tpm2b-attest = binary-string
 
 ; The decoded bytes MUST contain one marshalled TPMT_SIGNATURE, including
 ; its sigAlg selector and the algorithm-specific signature data.
-; The signed message is the quote's attestationData bytes, excluding the
-; outer TPM2B_ATTEST size prefix.
+; The signed message is the attestationData bytes in the enclosing
+; attestation's data, excluding the outer TPM2B_ATTEST size prefix.
 tpmt-signature = binary-string
 
-; PCR consistency requirements, enforced by the verifier:
+; PCR consistency requirements, enforced by the verifier for
+; tpm-quote-attestation only:
 ;
 ; When pcr-banks is present:
 ; - hash-alg MUST be a TPM_ALG_ID identifying a PCR-bank hash algorithm
