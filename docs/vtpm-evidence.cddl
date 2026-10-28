@@ -1,0 +1,98 @@
+; Requires the definitions in tsm-report.cddl.
+; Append that file to this one to obtain a complete schema, keeping
+; vtpm-evidence as the first rule (the root type).
+; From the repository root:
+;   cat docs/vtpm-evidence.cddl docs/tsm-report.cddl > /tmp/vtpm-evidence-complete.cddl
+
+vtpm-evidence = {
+  ? tsm-report: tsm-report
+  quote: tpm2b-attest
+  signature: tpmt-signature
+  ek-public: binary-string
+  ak-public: binary-string
+  ? pcr-banks: [ + vtpm-pcr-bank ]
+  ? event-log: binary-string
+}
+
+; TPM binary structures are defined in TPM Library Part 2 v185,
+; Tables 154, 155, and 219:
+; https://trustedcomputinggroup.org/wp-content/uploads/Trusted-Platform-Module-2.0-Library-Part-2-Structures_Version-185_pub.pdf
+; The verifier MUST enforce the decoded-payload requirements below.
+; Both payloads MUST use TPM 2.0 wire format, with no padding or trailing
+; bytes. binary-string provides the CBOR or JSON transport encoding.
+
+; The decoded bytes MUST contain one marshalled TPM2B_ATTEST, including
+; its big-endian UINT16 size prefix. size MUST equal the number of bytes
+; in attestationData. attestationData MUST contain a marshalled TPMS_ATTEST
+; with magic = TPM_GENERATED_VALUE and type = TPM_ST_ATTEST_QUOTE.
+tpm2b-attest = binary-string
+
+; The decoded bytes MUST contain one marshalled TPMT_SIGNATURE, including
+; its sigAlg selector and the algorithm-specific signature data.
+; The signed message is the quote's attestationData bytes, excluding the
+; outer TPM2B_ATTEST size prefix.
+tpmt-signature = binary-string
+
+; PCR consistency requirements, enforced by the verifier:
+;
+; When pcr-banks is present:
+; - hash-alg MUST be a TPM_ALG_ID identifying a PCR-bank hash algorithm
+;   supported by the verifier and permitted by the applicable TPM profile.
+; - index MUST be a zero-based PCR index valid for that bank under the
+;   applicable TPM profile.
+; - Each hash-alg MUST occur at most once.
+; - Each index MUST occur at most once within its bank.
+; - The supplied (hash-alg, index) pairs MUST exactly match the PCRs
+;   selected by the authenticated quote's TPMS_QUOTE_INFO.pcrSelect.
+; - Each decoded value MUST have the digest length of its bank's
+;   hash algorithm.
+; - Array order is not significant. If computing a digest from the
+;   supplied PCR values, process banks in the quote's pcrSelect order
+;   and PCRs in ascending index order within each bank, then hash the
+;   concatenated decoded PCR value bytes as specified for TPM2_Quote.
+;
+; The verifier MUST reject evidence that violates these requirements.
+;
+; Supplied PCR values are unsigned hints. TPM2_Quote and TPM2_PCR_Read
+; are not atomic, so the digest reconstructed from those values is not
+; required to equal the signed TPMS_QUOTE_INFO.pcrDigest.
+; A verifier MAY reconstruct quoted PCR values from event logs and check
+; them against the signed digest, or compare the signed digest directly
+; with reference values.
+;
+; When pcr-banks is absent, PCR values have not been supplied; this does
+; not imply that the quote selects no PCRs. A verifier that requires PCR
+; values MUST obtain or reconstruct them and validate them against the
+; authenticated quote, or report insufficient evidence.
+;
+; The verifier MUST also enforce its appraisal policy's PCR selection
+; requirements independently of these consistency checks.
+
+vtpm-pcr-bank = {
+  hash-alg: tpm-hash-alg
+  pcrs: [ + vtpm-pcr-value ]
+}
+
+; TPMI_ALG_HASH values from TPM Library Part 2 v185, Table 77, excluding
+; TPM_ALG_NULL. Numeric assignments follow TCG Algorithm Registry v2.0:
+; https://trustedcomputinggroup.org/wp-content/uploads/TCG-Algorithm-Registry-Version-2.0_pub.pdf
+; This is a closed list; new algorithms require a schema update.
+tpm-hash-alg = &(
+  TPM_ALG_SHA1:         0x0004
+  TPM_ALG_SHA256:       0x000B
+  TPM_ALG_SHA384:       0x000C
+  TPM_ALG_SHA512:       0x000D
+  TPM_ALG_SHA256_192:   0x000E
+  TPM_ALG_SM3_256:      0x0012
+  TPM_ALG_SHA3_256:     0x0027
+  TPM_ALG_SHA3_384:     0x0028
+  TPM_ALG_SHA3_512:     0x0029
+  TPM_ALG_SHAKE256_192: 0x002C
+  TPM_ALG_SHAKE256_256: 0x002D
+  TPM_ALG_SHAKE256_512: 0x002E
+)
+
+vtpm-pcr-value = {
+  index: uint
+  value: binary-string
+}
